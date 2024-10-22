@@ -26,7 +26,7 @@ model, preprocess = clip.load('ViT-B/32', device=device)
 image_dir = r"C:\Users\mrtyl\OneDrive\Desktop\testImages"  # Replace with the actual path
 
 # Load your own class names if needed, or set default class names
-class_names = ["apple", "banana", "cat", "water Bottle"]  # Replace with your custom class names
+class_names = ["apple", "banana", "cat", "water Bottle", "airplane", "bird", "car", "deer", "horse"]  # Replace with your custom class names
 
 # Load images from the specified directory
 image_files = [f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
@@ -68,7 +68,7 @@ def resize_image(image, scale_factor=4, interpolation=Image.BICUBIC):
 # 4. Define Retrieval Function with Image Enlargement
 # -------------------------------
 shown_images_history = defaultdict(set)
-def get_image_for_word(word, images, class_names, preprocess, model, device, top_k=3):
+def get_image_for_word(word, images, class_names, preprocess, model, device, top_k=3, use_clip_fallback = True):
     word = word.lower()
     print(f"\nSearching for the word: '{word}'")
 
@@ -126,6 +126,39 @@ def get_image_for_word(word, images, class_names, preprocess, model, device, top
         # Display the retrieved image
         image_pil.show()
         return image_pil
+    elif use_clip_fallback:
+        print(f"No exact match found for '{word}'. Using CLIP to find the most similar class.")
+        # Use CLIP to find the most similar class
+        text = clip.tokenize([word]).to(device)
+
+        with torch.no_grad():
+            text_features = model.encode_text(text)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+
+            # Encode all class names
+            class_prompts = [f"a photo of a {cls}" for cls in class_names]
+            class_tokens = clip.tokenize(class_prompts).to(device)
+
+            class_features = model.encode_text(class_tokens)
+            class_features /= class_features.norm(dim=-1, keepdim=True)
+
+            # Compute cosine similarity between input word and all class labels
+            similarities = (text_features @ class_features.T).squeeze(0)  # Shape: (100,)
+
+            # Find the class with the highest similarity
+            best_match_idx = similarities.argmax().item()
+            best_match_label = class_names[best_match_idx].lower()
+            best_similarity = similarities[best_match_idx].item()
+
+            print(f"Best match: '{class_names[best_match_idx]}' with similarity {best_similarity:.4f}")
+
+            if best_match_label in label_to_indices and label_to_indices[best_match_label]:
+                selected_index = random.choice(label_to_indices[best_match_label])
+                image, class_id = images[selected_index]
+                print(f"Retrieving image from class '{images.classes[class_id]}' (Index {selected_index}).")
+            else:
+                print(f"No images found for the matched class '{class_names[best_match_idx]}'.")
+                return None
     else:
         print("No image retrieved.")
         return None
