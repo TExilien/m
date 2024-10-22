@@ -1,17 +1,16 @@
 import os
 import clip
+from torchvision import transforms
 import torch
 import numpy as np
-from torchvision.datasets import CIFAR100
-from torchvision import transforms
 from PIL import Image
 import random
 import tkinter as tk
 from tkinter import Canvas
-import numpy as np
+from collections import defaultdict
 
 # -------------------------------
-# 1. Setup and Load the Dataset
+# 1. Setup and Load the CLIP Model
 # -------------------------------
 
 # Load the CLIP model
@@ -19,25 +18,30 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 model, preprocess = clip.load('ViT-B/32', device=device)
 
-# Download and load the CIFAR100 dataset
-cifar100 = CIFAR100(root=os.path.expanduser("~/.cache"), download=True, train=False)
-
-# Extract class names
-class_names = cifar100.classes  # List of 100 class names
-print(f"CIFAR100 Classes: {class_names}")
-
 # -------------------------------
-# 2. Build Label-to-Image Mapping
+# 2. Load Custom Images and Class Names
 # -------------------------------
 
-# Create a dictionary mapping each class label to the list of image indices
-label_to_indices = {label.lower(): [] for label in class_names}  # Ensure labels are lowercase
+# Directory where your custom images are stored
+image_dir = r"C:\Users\mrtyl\OneDrive\Desktop\testImages"  # Replace with the actual path
 
-for idx, (_, class_id) in enumerate(cifar100):
-    label = cifar100.classes[class_id].lower()
+# Load your own class names if needed, or set default class names
+class_names = ["apple", "banana", "cat", "water Bottle"]  # Replace with your custom class names
+
+# Load images from the specified directory
+image_files = [f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+label_to_indices = {label: [] for label in class_names}
+
+# Preprocess and load all images into memory, map them to class names
+images = []
+for idx, image_file in enumerate(image_files):
+    image_path = os.path.join(image_dir, image_file)
+    image = Image.open(image_path)
+    label = random.choice(class_names)  # Assign a random label for this example
     label_to_indices[label].append(idx)
+    images.append(preprocess(image).unsqueeze(0).to(device))
 
-print("Label to image indices mapping created.")
+print("Images and label-to-index mapping created.")
 
 # -------------------------------
 # 3. Define Image Enlargement Functions
@@ -63,115 +67,95 @@ def resize_image(image, scale_factor=4, interpolation=Image.BICUBIC):
 # -------------------------------
 # 4. Define Retrieval Function with Image Enlargement
 # -------------------------------
-
-def get_image_for_word(word, label_to_indices, cifar100, preprocess, model, device, use_clip_fallback=True, enlarge=False):
-    """
-    Retrieve and display an image corresponding to the given word from the CIFAR100 dataset,
-    optionally enlarging it.
-
-    Args:
-        word (str): The input word to search for.
-        label_to_indices (dict): Mapping from class labels to image indices.
-        cifar100 (CIFAR100): The CIFAR100 dataset object.
-        preprocess (callable): Preprocessing function for images.
-        model (CLIP model): The loaded CLIP model.
-        device (str): Device to perform computations on ('cuda' or 'cpu').
-        use_clip_fallback (bool): Whether to use CLIP to find the closest class if exact match not found.
-        enlarge (bool): Whether to enlarge the retrieved image.
-        
-
-    Returns:
-        PIL.Image or None: The retrieved (and optionally enlarged) image if found, else None.
-    """
+shown_images_history = defaultdict(set)
+def get_image_for_word(word, images, class_names, preprocess, model, device, top_k=3):
     word = word.lower()
     print(f"\nSearching for the word: '{word}'")
 
-    image = None  # Initialize image
+    # Step 1: Encode the input word into text features
+    text = clip.tokenize([word]).to(device)
 
-    if word in label_to_indices and label_to_indices[word]:
-        # Exact match found
-        selected_index = random.choice(label_to_indices[word])
-        image, class_id = cifar100[selected_index]
-        print(f"Exact match found in class '{cifar100.classes[class_id]}'. Retrieving image index {selected_index}.")
-    elif use_clip_fallback:
-        print(f"No exact match found for '{word}'. Using CLIP to find the most similar class.")
-        # Use CLIP to find the most similar class
-        text = clip.tokenize([word]).to(device)
+    with torch.no_grad():
+        # Encode the text input to get text features
+        text_features = model.encode_text(text)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
 
-        with torch.no_grad():
-            text_features = model.encode_text(text)
-            text_features /= text_features.norm(dim=-1, keepdim=True)
+        # Step 2: Encode all images to get image features
+        image_features = []
+        for image_tensor in images:
+            with torch.no_grad():
+                image_features.append(model.encode_image(image_tensor))
+        image_features = torch.cat(image_features, dim=0)  # Stack all image features
+        image_features /= image_features.norm(dim=-1, keepdim=True)
 
-            # Encode all class names
-            class_prompts = [f"a photo of a {cls}" for cls in class_names]
-            class_tokens = clip.tokenize(class_prompts).to(device)
+        # Step 3: Compute similarity between text features and image features
+        similarities = (text_features @ image_features.T).squeeze(0)  # Shape: (number_of_images,)
 
-            class_features = model.encode_text(class_tokens)
-            class_features /= class_features.norm(dim=-1, keepdim=True)
+       # Step 4: Get the indices of the top-k most similar images
+        top_k_indices = similarities.topk(top_k).indices.tolist()
 
-            # Compute cosine similarity between input word and all class labels
-            similarities = (text_features @ class_features.T).squeeze(0)  # Shape: (100,)
+        # Filter out images that have already been shown
+        available_indices = [idx for idx in top_k_indices if idx not in shown_images_history[word]]
 
-            # Find the class with the highest similarity
-            best_match_idx = similarities.argmax().item()
-            best_match_label = class_names[best_match_idx].lower()
-            best_similarity = similarities[best_match_idx].item()
+        if not available_indices:  # If all images in the top-k have been shown, reset history
+            shown_images_history[word].clear()
+            available_indices = top_k_indices
 
-            print(f"Best match: '{class_names[best_match_idx]}' with similarity {best_similarity:.4f}")
+        # Step 5: Randomly pick one of the available images
+        selected_index = random.choice(available_indices)
+        best_similarity = similarities[selected_index].item()
 
-            if best_match_label in label_to_indices and label_to_indices[best_match_label]:
-                selected_index = random.choice(label_to_indices[best_match_label])
-                image, class_id = cifar100[selected_index]
-                print(f"Retrieving image from class '{cifar100.classes[class_id]}' (Index {selected_index}).")
-            else:
-                print(f"No images found for the matched class '{class_names[best_match_idx]}'.")
-                return None
-    else:
-        print(f"No images found for the word: '{word}'")
-        return None
+        # Mark the selected image as shown
+        shown_images_history[word].add(selected_index)
 
-    if image:
-        # Optionally enlarge the image
-        if enlarge:
-            print("Resizing the image using interpolation.")
-            image = resize_image(image, scale_factor=4, interpolation=Image.BICUBIC)
-            print("Image has been enlarged.")
+        print(f"Selected image index: {selected_index} with similarity {best_similarity:.4f}")
 
-        # Display the image
-        image.show()
-        return image
+        # Retrieve the selected image tensor
+        best_image_tensor = images[selected_index]
+
+    if best_image_tensor is not None and best_image_tensor.numel() > 0:
+        unnormalize = transforms.Normalize(
+        mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+        std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+        image = unnormalize(best_image_tensor.squeeze(0))  # Remove batch dimension
+        image = torch.clamp(image, 0, 1)  # Ensure values are within [0, 1]
+        # Convert to numpy array and then PIL image for displaying
+        image_np = image.permute(1, 2, 0).cpu().numpy()  # CHW -> HWC
+        image_pil = Image.fromarray((image_np * 255).astype(np.uint8))  # Convert to PIL Image
+        
+        # Display the retrieved image
+        image_pil.show()
+        return image_pil
     else:
         print("No image retrieved.")
         return None
+
+
+
 
 # -------------------------------
 # 5. Interactive Retrieval with Enlargement Options
 # -------------------------------
 
 def user(user_input):
-    print("CIFAR100 Image Retrieval using CLIP")
+    print("Custom Image Retrieval using CLIP")
     print("Type 'exit' to quit.\n")
 
     user_input = user_input.strip()
-    # Ask the user if they want to enlarge the image
-    enlarge_input = input("Do you want to enlarge the image? (yes/no): ").strip().lower()
-    enlarge = enlarge_input in ['yes', 'y']
     pix = get_image_for_word(
             word=user_input,
-            label_to_indices=label_to_indices,
-            cifar100=cifar100,
+            images=images,
+            class_names=class_names,
             preprocess=preprocess,
             model=model,
             device=device,
-            use_clip_fallback=True,  # Set to False if you want to disable CLIP fallback
-            enlarge=enlarge
+            top_k=3
         )
-        #Convert the image to RGB (if it's in a different format)
+    # Convert the image to RGB (if it's in a different format)
     pix = pix.convert("RGB")
 
     # Get pixel data as a NumPy array
-    pixel_data = np.array(pix)
-    print(pixel_data)  # This will print the array of pixel values
+    pixel_data = np.array(pix) # This is the array of pixel values 
     return pixel_data
 
 # Convert image pixel data to shapes
@@ -186,21 +170,5 @@ def draw_image_as_shapes(canvas, pixel_data, shape_size=5):
             x1, y1 = col + shape_size, row + shape_size
             canvas.create_oval(x0, y0, x1, y1, fill=color, outline=color)
     print("Finished drawing shapes.")
-
-# Set up the Tkinter window and canvas
-def run_drawing_app(image_pixel_data):
-    root = tk.Tk()
-    root.title("Shape Drawing App")
-    print("Setting up the Tkinter window...")
-    
-    # Create a canvas for drawing
-    canvas = Canvas(root, width=224, height=224, bg="white")
-    canvas.pack()
-    
-    # Draw the image as shapes on the canvas
-    draw_image_as_shapes(canvas, image_pixel_data)
-    
-    root.mainloop()
-
 
 
