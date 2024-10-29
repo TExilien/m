@@ -13,6 +13,8 @@ import mic, model
 
 ########### Window Settings ###########
 
+## 
+
 root = Tk()
 canvas = Canvas(root)
 
@@ -28,6 +30,16 @@ prevPoint = [0, 0]
 currentPoint = [0, 0]
 penColor = "black"
 stroke = 1
+isLasso = False
+lassoStartX = [0, 0]
+lassoStartY = [0, 0]
+lassoEndX = [0, 0]
+lassoEndY = [0, 0]
+moveLasso = False
+lassoObjects = []
+lassoId = 0
+movementInProgress = False
+
 
 canvas_data = []
 
@@ -39,7 +51,6 @@ shapes = []
 shapeFill = "black"
 width = 0
 height = 0
-
 
 # Increase Stroke Size By 1
 def strokeI():
@@ -67,13 +78,30 @@ def strokeDf():
     global stroke
     stroke = 1
 
-
 # Pencil
 def pencil():
     global penColor
 
     penColor = "black"
     canvas["cursor"] = "pencil"
+
+# Lasso
+def lasso():
+    global penColor
+    global isLasso
+    global moveLasso
+    global lassoObjects
+
+    penColor = "red"
+    canvas["cursor"] = "crosshair"
+    isLasso = not isLasso
+    if not isLasso:
+        moveLasso = False
+        resetLasso()
+        canvas.delete(lassoId)
+        lassoObjects = []
+        pencil()
+    print("lasso: " + str(isLasso))
 
 
 # Eraser is less erasing and actually just painting over the pencil with white
@@ -120,7 +148,7 @@ def on_shape_click(event):
 
     # Check if a shape is selected in the OptionMenu
     if shapeSelect.get() != "None":
-        askShapeDimention()  # Ask for dimensions if needed
+        askShapeDimension()  # Ask for dimensions if needed
 
         # Create the shape based on the selection
         match shapeSelect.get():
@@ -165,27 +193,130 @@ def on_shape_drag(event):
 def paint(event):
     global prevPoint
     global currentPoint
+    global isLasso
+    global lassoEndX
+    global lassoEndY
+    global lassoStartX
+    global lassoStartY
+    global lassoId
+    global moveLasso
 
     x = event.x
     y = event.y
 
     currentPoint = [x, y]
-
-    if prevPoint != [0, 0]:
-        canvas.create_polygon(
-            prevPoint[0],
-            prevPoint[1],
-            currentPoint[0],
-            currentPoint[1],
-            fill=penColor,
-            outline=penColor,
-            width=stroke,
-        )
+    
+ 
+    if isLasso:
+        print("calling active lasso")
+        activeLasso(event)
+    else:
+        if prevPoint != [0, 0]:
+            canvas.create_polygon(
+                prevPoint[0],
+                prevPoint[1],
+                currentPoint[0],
+                currentPoint[1],
+                fill=penColor,
+                outline=penColor,
+                width=stroke,
+            )
 
     prevPoint = currentPoint
 
     if event.type == "5":
         prevPoint = [0, 0]
+
+def moveLassoObject(direction):
+    global lassoId
+    global lassoObjects
+    global moveLasso
+
+    if not moveLasso:
+        return
+
+    translate = [0, 0]
+
+    if len(lassoObjects) == 0:
+        lassoObjects = canvas.find_enclosed(canvas.bbox(lassoId)[0], 
+                                            canvas.bbox(lassoId)[1], 
+                                            canvas.bbox(lassoId)[2], 
+                                            canvas.bbox(lassoId)[3])
+        
+    if direction == "Left":
+        translate = [-1, 0]
+    elif direction == "Right":
+        translate = [1, 0]
+    elif direction== "Up":
+        translate = [0, -1]
+    elif direction == "Down":
+        translate = [0, 1]
+
+    # translate all objects within the lasso
+    for object in lassoObjects:
+        canvas.move(object, translate[0], translate[1])
+
+    #translate the lasso
+    canvas.move(lassoId, translate[0], translate[1])
+
+
+def activeLasso(event):
+    global lassoEndX
+    global lassoEndY
+    global lassoStartX
+    global lassoStartY
+    global isLasso
+    global moveLasso
+    global lassoId
+    global movementInProgress
+
+    if str(event.type) == "4":
+        print("starting lasso")
+        lassoStartX = event.x
+        lassoStartY = event.y
+    
+    elif str(event.type) == "5":
+        print("end of lasso")
+        lassoEndX = event.x
+        lassoEndY = event.y
+        lassoId = canvas.create_polygon(
+                lassoStartX,
+                lassoStartY,
+                lassoEndX,
+                lassoStartY,
+                lassoEndX,
+                lassoEndY,
+                lassoStartX,
+                lassoEndY,
+                dash=(5,),
+                fill ='',
+                outline = penColor,
+                width=stroke,
+            )
+        moveLasso = True
+    
+def onArrowKeyDown(direction):
+    global movementInProgress
+    if not movementInProgress:
+        movementInProgress = True
+        print("calling move lasso")
+        moveLassoObject(direction)
+
+def onArrowKeyUp():
+    global movementInProgress
+    movementInProgress = False
+
+def resetLasso():
+    global lassoEndX
+    global lassoEndY
+    global lassoStartX
+    global lassoStartY
+
+
+    lassoEndX = 0
+    lassoEndY = 0
+    lassoStartX = 0
+    lassoStartY = 0
 
 
 # Close App
@@ -258,8 +389,8 @@ def redrawCanvas():
             canvas.create_polygon(coords, fill=color, outline=color, width=stroke)
 
 
-# Asking Shape Dimentions
-def askShapeDimention():
+# Asking Shape Dimensions
+def askShapeDimension():
     global width, height
 
     width = simpledialog.askinteger(
@@ -299,7 +430,7 @@ frame1 = Frame(root, height=150, width=650)
 frame1.grid(row=0, column=0)
 
 # Holder Frame
-holder = Frame(frame1, height=120, width=550, bg="white", pady=10)
+holder = Frame(frame1, height=120, width=600, bg="white", pady=10)
 holder.grid(row=0, column=0, sticky=W)
 holder.place(x=0, y=0)
 
@@ -359,11 +490,17 @@ label7.grid(row=0, column=2)
 clearButton = Button(holder, text="CLEAR", height=1, width=12, command=clearScreen)
 clearButton.grid(row=1, column=2)
 
-# Tool 8 - Exit App
+# Tool 8 - Lasso
+lassoButton = Button(holder, text="LASSO", height=1, width=12, command=lasso)
+lassoButton.grid(row=2, column=2)
+
+# Tool 9 - Exit App
 exitButton = Button(
     holder, text="Exit", height=1, width=12, command=lambda: root.destroy()
 )
-exitButton.grid(row=2, column=2)
+exitButton.grid(row=3, column=2)
+
+
 
 #### Stroke Size ####
 
@@ -395,16 +532,16 @@ shapeMenu.grid(row=1, column=4)
 shapeMenu.config(width=8)
 
 # Tool 9 - Decreament by 1
-dimentionButton = Button(
-    holder, text="Dimention", height=1, width=12, command=askShapeDimention
+DimensionButton = Button(
+    holder, text="Dimension", height=1, width=12, command=askShapeDimension
 )
-dimentionButton.grid(row=2, column=4)
+DimensionButton.grid(row=2, column=4)
 
 # Tool 9 - Speech-Draw
-dimentionButton = Button(
+DimensionButton = Button(
     holder, text="speech-Draw", height=1, width=12, command=speak
 )
-dimentionButton.grid(row=3, column=4)
+DimensionButton.grid(row=3, column=4)
 
 # Tool 10 - Default
 fillButton = Button(holder, text="Fill", height=1, width=12, command=shapeColorChoice)
@@ -441,12 +578,23 @@ root.bind("<c>", lambda event: colorChoice())
 root.bind("<Control-s>", lambda event: saveImg())
 root.bind("<Control-o>", lambda event: openEcts())
 root.bind("<Control-n>", lambda event: newApp())
+root.bind("<l>", lambda event: lasso())
 root.bind("<Delete>", lambda event: clearScreen())
 root.bind("<Control-d>", lambda event: clearScreen())
-root.bind("<d>", lambda event: askShapeDimention())
+root.bind("<d>", lambda event: askShapeDimension())
 root.bind("<f>", lambda event: shapeColorChoice())
 root.bind("<t>", lambda event: speak())
 root.bind("<s>", show_shape_menu)
+root.bind("<Left>", moveLassoObject("Left"))
+root.bind("<Right>", moveLassoObject("Right"))
+root.bind("<Up>", moveLassoObject("Up"))
+root.bind("<Down>", moveLassoObject("Down"))
+# root.bind("<Left>", onArrowKeyDown("Left"))
+# root.bind("<Right>", onArrowKeyDown("Right"))
+# root.bind("<Up>", onArrowKeyDown("Up"))
+# root.bind("<Down>", onArrowKeyDown("Down"))
+# root.bind("<KeyRelease>", onArrowKeyUp())
+
 ########### Main Loop ###########
 canvas.pack()
 root.mainloop()
