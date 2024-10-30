@@ -91,22 +91,13 @@ def lasso():
     global isLasso
     global moveLasso
     global lassoId
-    
 
     resetLasso()
 
     isLasso = True
 
-    
-
     penColor = "red"
     canvas["cursor"] = "crosshair"
-    
-    print("isLasso: " + str(isLasso))
-
-    
-
-    
 
 
 def resetLasso():
@@ -300,10 +291,9 @@ def moveLassoObject(direction):
         return
 
 
-    canvas.move(lassoId, translate[0], translate[1])
-
     for object in lassoObjects:
         canvas.move(object, translate[0], translate[1])
+
 
 
     
@@ -406,8 +396,7 @@ def speak():
     # Run the drawing app with the retrieved image pixel data
     print("say your object please")
     user_speech = mic.talk()
-    retrieved_image_pixels = model.user(user_speech)
-    model.draw_image_as_shapes(canvas, retrieved_image_pixels)
+    model.open_gallery_window(canvas, user_speech)
 
 
 ########### Paint App ###########
