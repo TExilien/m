@@ -13,6 +13,8 @@ import mic, model
 
 ########### Window Settings ###########
 
+## 
+
 root = Tk()
 canvas = Canvas(root)
 
@@ -48,7 +50,6 @@ shapeFill = "black"
 width = 0
 height = 0
 
-
 # Increase Stroke Size By 1
 def strokeI():
     global stroke
@@ -74,7 +75,6 @@ def strokeD():
 def strokeDf():
     global stroke
     stroke = 1
-
 
 # Pencil
 def pencil():
@@ -174,7 +174,7 @@ def on_shape_click(event):
 
     # Check if a shape is selected in the OptionMenu
     if shapeSelect.get() != "None":
-        askShapeDimention()  # Ask for dimensions if needed
+        askShapeDimension()  # Ask for dimensions if needed
 
         # Create the shape based on the selection
         match shapeSelect.get():
@@ -378,8 +378,8 @@ def redrawCanvas():
             canvas.create_polygon(coords, fill=color, outline=color, width=stroke)
 
 
-# Asking Shape Dimentions
-def askShapeDimention():
+# Asking Shape Dimensions
+def askShapeDimension():
     global width, height
 
     width = simpledialog.askinteger(
@@ -419,7 +419,7 @@ frame1 = Frame(root, height=150, width=650)
 frame1.grid(row=0, column=0)
 
 # Holder Frame
-holder = Frame(frame1, height=120, width=550, bg="white", pady=10)
+holder = Frame(frame1, height=120, width=600, bg="white", pady=10)
 holder.grid(row=0, column=0, sticky=W)
 holder.place(x=0, y=0)
 
@@ -479,9 +479,8 @@ label7.grid(row=0, column=2)
 clearButton = Button(holder, text="CLEAR", height=1, width=12, command=clearScreen)
 clearButton.grid(row=1, column=2)
 
-# Tool 8 - Lasso Button
-lassoButton = Button(
-    holder, text="LASSO", height=1, width=12, command=lasso)
+# Tool 8 - Lasso
+lassoButton = Button(holder, text="LASSO", height=1, width=12, command=lasso)
 lassoButton.grid(row=2, column=2)
 
 # Tool 9 - Exit App
@@ -519,16 +518,16 @@ shapeMenu.grid(row=1, column=4)
 shapeMenu.config(width=8)
 
 # Tool 9 - Decreament by 1
-dimentionButton = Button(
-    holder, text="Dimention", height=1, width=12, command=askShapeDimention
+DimensionButton = Button(
+    holder, text="Dimension", height=1, width=12, command=askShapeDimension
 )
-dimentionButton.grid(row=2, column=4)
+DimensionButton.grid(row=2, column=4)
 
 # Tool 9 - Speech-Draw
-dimentionButton = Button(
+DimensionButton = Button(
     holder, text="speech-Draw", height=1, width=12, command=speak
 )
-dimentionButton.grid(row=3, column=4)
+DimensionButton.grid(row=3, column=4)
 
 # Tool 10 - Default
 fillButton = Button(holder, text="Fill", height=1, width=12, command=shapeColorChoice)
@@ -565,9 +564,10 @@ root.bind("<c>", lambda event: colorChoice())
 root.bind("<Control-s>", lambda event: saveImg())
 root.bind("<Control-o>", lambda event: openEcts())
 root.bind("<Control-n>", lambda event: newApp())
+root.bind("<l>", lambda event: lasso())
 root.bind("<Delete>", lambda event: clearScreen())
 root.bind("<Control-d>", lambda event: clearScreen())
-root.bind("<d>", lambda event: askShapeDimention())
+root.bind("<d>", lambda event: askShapeDimension())
 root.bind("<f>", lambda event: shapeColorChoice())
 root.bind("<t>", lambda event: speak())
 root.bind("<s>", show_shape_menu)
