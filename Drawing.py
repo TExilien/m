@@ -288,7 +288,7 @@ def moveLassoObject(direction):
     elif direction == "Down":
         translate = [0, 1]
     else:
-        return
+        translate = [(currentPoint[0]-prevPoint[0]), (currentPoint[1]-prevPoint[1])]
 
 
     for object in lassoObjects:
