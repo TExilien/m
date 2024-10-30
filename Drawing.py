@@ -28,6 +28,14 @@ prevPoint = [0, 0]
 currentPoint = [0, 0]
 penColor = "black"
 stroke = 1
+isLasso = False
+lassoId = 0
+lassoStartX = 0
+lassoStartY = 0
+lassoEndX = 0
+lassoEndY = 0
+moveLasso = False
+lassoObjects = []
 
 canvas_data = []
 
@@ -72,9 +80,55 @@ def strokeDf():
 def pencil():
     global penColor
 
+    resetLasso()
+
     penColor = "black"
     canvas["cursor"] = "pencil"
 
+# Lasso
+def lasso():
+    global penColor
+    global isLasso
+    global moveLasso
+    global lassoId
+    
+
+    resetLasso()
+
+    isLasso = True
+
+    
+
+    penColor = "red"
+    canvas["cursor"] = "crosshair"
+    
+    print("isLasso: " + str(isLasso))
+
+    
+
+    
+
+
+def resetLasso():
+
+    global lassoEndX
+    global lassoEndY
+    global lassoStartX
+    global lassoStartY
+    global moveLasso
+    global lassoId
+    global lassoObjects
+    global isLasso
+
+    lassoEndX = 0
+    lassoEndY = 0
+    lassoStartX = 0
+    lassoStartY = 0
+
+    isLasso = False
+    moveLasso = False
+    canvas.delete(lassoId)
+    lassoObjects = []
 
 # Eraser is less erasing and actually just painting over the pencil with white
 def eraser():
@@ -156,7 +210,7 @@ def on_shape_drag(event):
         # Move the shape by that distance
         canvas.move(selected_shape, dx, dy)
 
-        # Update the last known position
+        # Update the known position
         x = event.x
         y = event.y
         currentPoint = [x,y]
@@ -165,13 +219,19 @@ def on_shape_drag(event):
 def paint(event):
     global prevPoint
     global currentPoint
+    global moveLasso
+    global isLasso
 
     x = event.x
     y = event.y
 
     currentPoint = [x, y]
 
-    if prevPoint != [0, 0]:
+    if moveLasso:
+        moveLassoObject("none")
+    if isLasso:
+        createLasso(event)
+    elif prevPoint != [0, 0]:
         canvas.create_polygon(
             prevPoint[0],
             prevPoint[1],
@@ -187,6 +247,66 @@ def paint(event):
     if event.type == "5":
         prevPoint = [0, 0]
 
+def createLasso(event):
+    global lassoId
+    global lassoStartX
+    global lassoStartY
+    global lassoEndX
+    global lassoEndY
+    global moveLasso
+    global lassoObjects
+
+    if not moveLasso:
+        if str(event.type) == "4":
+            lassoStartX = event.x
+            lassoStartY = event.y
+        elif str(event.type) == "5":
+            lassoEndX = event.x
+            lassoEndY = event.y
+            lassoId = canvas.create_rectangle(
+                    lassoStartX,
+                    lassoStartY,
+                    lassoEndX,
+                    lassoEndY,
+                    fill='',
+                    dash= (5,),
+                    outline=penColor,
+                    width=stroke,
+                )
+            moveLasso = True
+
+            if len(lassoObjects) == 0:
+                lassoObjects = canvas.find_enclosed(canvas.bbox(lassoId)[0],
+                                                    canvas.bbox(lassoId)[1],
+                                                    canvas.bbox(lassoId)[2],
+                                                    canvas.bbox(lassoId)[3])
+
+def moveLassoObject(direction):
+
+    global lassoId
+    global lassoObjects
+
+    translate = []
+
+    if direction == "Left":
+        translate = [-1, 0]
+    elif direction == "Right":
+        translate = [1, 0]
+    elif direction == "Up":
+        translate = [0, -1]
+    elif direction == "Down":
+        translate = [0, 1]
+    else:
+        return
+
+
+    canvas.move(lassoId, translate[0], translate[1])
+
+    for object in lassoObjects:
+        canvas.move(object, translate[0], translate[1])
+
+
+    
 
 # Close App
 def newApp():
@@ -359,11 +479,15 @@ label7.grid(row=0, column=2)
 clearButton = Button(holder, text="CLEAR", height=1, width=12, command=clearScreen)
 clearButton.grid(row=1, column=2)
 
-# Tool 8 - Exit App
+# Tool 8 - Lasso Button
+lassoButton = Button(
+    holder, text="LASSO", height=1, width=12, command=lasso)
+lassoButton.grid(row=2, column=2)
+
+# Tool 9 - Exit App
 exitButton = Button(
-    holder, text="Exit", height=1, width=12, command=lambda: root.destroy()
-)
-exitButton.grid(row=2, column=2)
+    holder, text="Exit", height=1, width=12, command=lambda: root.destroy())
+exitButton.grid(row=3, column=2)
 
 #### Stroke Size ####
 
@@ -447,6 +571,12 @@ root.bind("<d>", lambda event: askShapeDimention())
 root.bind("<f>", lambda event: shapeColorChoice())
 root.bind("<t>", lambda event: speak())
 root.bind("<s>", show_shape_menu)
+root.bind("<l>", lambda event: lasso())
+root.bind("<Left>", lambda event: moveLassoObject("Left"))
+root.bind("<Right>", lambda event: moveLassoObject("Right"))
+root.bind("<Up>", lambda event: moveLassoObject("Up"))
+root.bind("<Down>", lambda event: moveLassoObject("Down"))
+
 ########### Main Loop ###########
 canvas.pack()
 root.mainloop()

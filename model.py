@@ -23,7 +23,7 @@ model, preprocess = clip.load('ViT-B/32', device=device)
 # -------------------------------
 
 # Directory where your custom images are stored
-image_dir = r"C:\Users\mrtyl\OneDrive\Desktop\testImages"  # Replace with the actual path
+image_dir = r"/Users/jazmynharris/Desktop/capstone/m/dSet"   # Replace with the actual path
 
 # Load your own class names if needed, or set default class names
 class_names = ["apple", "banana", "cat", "water Bottle"]  # Replace with your custom class names
