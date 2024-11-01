@@ -19,9 +19,9 @@ root = Tk()
 canvas = Canvas(root)
 
 root.title("Paint - ECTS v1.0")
-root.geometry("650x650")
+root.geometry("800x800")
 
-root.resizable(False, False)
+root.resizable(True, True)
 
 ########### Functions ###########
 
@@ -38,6 +38,7 @@ lassoEndX = 0
 lassoEndY = 0
 moveLasso = False
 lassoObjects = []
+inZoom = False
 
 canvas_data = []
 
@@ -76,11 +77,20 @@ def strokeDf():
     global stroke
     stroke = 1
 
+# Zoom
+
+def zoomControl():
+    global inZoom
+
+    inZoom = True
+
 # Pencil
 def pencil():
     global penColor
+    global inZoom
 
     resetLasso()
+    inZoom = False
 
     penColor = "black"
     canvas["cursor"] = "pencil"
@@ -91,7 +101,9 @@ def lasso():
     global isLasso
     global moveLasso
     global lassoId
+    global inZoom
 
+    inZoom = False
     resetLasso()
 
     isLasso = True
@@ -218,9 +230,11 @@ def paint(event):
 
     currentPoint = [x, y]
 
-    if moveLasso:
+    if inZoom:
+        pass
+    elif moveLasso:
         moveLassoObject("none")
-    if isLasso:
+    elif isLasso:
         createLasso(event)
     elif prevPoint != [0, 0]:
         canvas.create_polygon(
@@ -399,12 +413,18 @@ def speak():
     model.open_gallery_window(canvas, user_speech)
 
 
+# Zooming in and out of the canvas
+def zoom(event, scale):
+
+    canvas.scale("all", event.x, event.y, scale, scale)
+
+
 ########### Paint App ###########
 
 #### Paint Tools Frame ####
 
 # Main Frame
-frame1 = Frame(root, height=150, width=650)
+frame1 = Frame(root, height=150, width=800)
 frame1.grid(row=0, column=0)
 
 # Holder Frame
@@ -458,9 +478,15 @@ openButton.grid(row=2, column=1)
 newButton = Button(holder, text="NEW", height=1, width=12, command=newApp)
 newButton.grid(row=3, column=1)
 
+# Tool 10 - Exit App
+exitButton = Button(
+    holder, text="Exit", height=1, width=12, command=lambda: root.destroy())
+exitButton.grid(row=4, column=1)
+
+
 #### OTHER ####
 
-# Label for Tool 7 and 8
+# Label for Tool 7, 8, 9, 10, 11
 label7 = Label(holder, text="OTHER", borderwidth=1, relief=SOLID, width=15)
 label7.grid(row=0, column=2)
 
@@ -468,14 +494,17 @@ label7.grid(row=0, column=2)
 clearButton = Button(holder, text="CLEAR", height=1, width=12, command=clearScreen)
 clearButton.grid(row=1, column=2)
 
+# Tool 8 - Zoom in and out of Canvas
+zoomin = Button(holder, text="Zoom In", height=1, width=12, command=zoomControl)
+zoomin.grid(row=2, column=2)
+
+zoomout= Button(holder, text="Zoom Out", height=1, width=12, command=zoomControl)
+zoomout.grid(row=3, column=2)
+
 # Tool 8 - Lasso
 lassoButton = Button(holder, text="LASSO", height=1, width=12, command=lasso)
-lassoButton.grid(row=2, column=2)
+lassoButton.grid(row=4, column=2)
 
-# Tool 9 - Exit App
-exitButton = Button(
-    holder, text="Exit", height=1, width=12, command=lambda: root.destroy())
-exitButton.grid(row=3, column=2)
 
 #### Stroke Size ####
 
@@ -527,7 +556,7 @@ fillButton.grid(row=4, column=4)
 #### Canvas Frame ####
 
 # Main Frame
-frame2 = Frame(root, height=500, width=650)
+frame2 = Frame(root, height=500, width=800)
 frame2.grid(row=1, column=0)
 
 # Making a Canvas
@@ -565,6 +594,8 @@ root.bind("<Left>", lambda event: moveLassoObject("Left"))
 root.bind("<Right>", lambda event: moveLassoObject("Right"))
 root.bind("<Up>", lambda event: moveLassoObject("Up"))
 root.bind("<Down>", lambda event: moveLassoObject("Down"))
+root.bind("<i>", lambda event: zoom(event, 2))
+root.bind("<o>", lambda event: zoom(event, 0.5))
 
 ########### Main Loop ###########
 canvas.pack()
