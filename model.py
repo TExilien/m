@@ -7,7 +7,8 @@ from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import Canvas, Toplevel, Button
 from collections import defaultdict
-import time
+import requests
+from io import BytesIO
 
 # -------------------------------
 # Setup and Load the CLIP Model
@@ -17,39 +18,65 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load('ViT-B/32', device=device)
 
 # -------------------------------
-# Load Custom Images and Class Names
+# Google Custom Search API Setup
 # -------------------------------
 
-image_dir = r"C:\Users\mrtyl\OneDrive\Desktop\testImages"  # Replace with the actual path
-class_names = ["apple", "banana", "cat", "water Bottle", "airplane", "bird", "car", "deer", "horse"]
-image_files = [f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-label_to_indices = defaultdict(list)
+API_KEY = "AIzaSyAvYAyQgwtMddW1Y_gtglh-Re5DGY12S-M"
+CSE_ID = "831f214a05dd14b5a"
 
-# Load images and map them to correct labels based on file names
-images = []
-for idx, image_file in enumerate(image_files):
-    image_path = os.path.join(image_dir, image_file)
-    image = Image.open(image_path)
+def google_search_images(query, num_results=20):
+    search_url = "https://www.googleapis.com/customsearch/v1"
+    max_results_per_request = 10  # API limit
+    image_urls = []
 
-    # Match label based on filename; skip if no match is found
-    label = next((name for name in class_names if name.lower() in image_file.lower()), None)
-    if label:
-        label_to_indices[label].append(idx)  # Map image index to the correct label
-        images.append(preprocess(image).unsqueeze(0).to(device))
+    for start in range(1, num_results, max_results_per_request):
+        params = {
+            "key": API_KEY,
+            "cx": CSE_ID,
+            "q": query,
+            "searchType": "image",
+            "num": min(max_results_per_request, num_results - len(image_urls)),
+            "start": start,
+        }
+        
+        try:
+            response = requests.get(search_url, params=params)
+            response.raise_for_status()
+            search_results = response.json().get("items", [])
+            image_urls.extend([item["link"] for item in search_results])
+
+            # Stop if we have enough images
+            if len(image_urls) >= num_results:
+                break
+        except Exception as e:
+            print(f"Failed to retrieve images for '{query}': {e}")
+            break
+
+    return image_urls[:num_results]  # Return exactly the requested number of images
+
 
 # -------------------------------
-# Updated Retrieval Function to Filter by Label
+# Updated Retrieval Function to Use Google API with Background Removal
 # -------------------------------
 
-def get_images_for_word(word, images, label_to_indices):
-    word = word.lower()
+def get_images_for_word(word):
+    try:
+        image_urls = google_search_images(word, num_results=20)
+        selected_images = []
+        for url in image_urls:
+            try:
+                response = requests.get(url, timeout=5)
+                img = Image.open(BytesIO(response.content)).convert("RGBA")  # Ensure RGBA format
+                
+                # Preprocess and add to selected images
+                selected_images.append(preprocess(img).unsqueeze(0).to(device))
+            except Exception as e:
+                print(f"Skipping an image due to error: {e}")
+                continue
 
-    if word in label_to_indices:
-        indices = label_to_indices[word]
-        selected_images = [images[idx] for idx in indices]
-        return selected_images
-    else:
-        print(f"No images found for the word '{word}'.")
+        return selected_images if selected_images else []
+    except Exception as e:
+        print(f"Failed to retrieve images for '{word}': {e}")
         return []
 
 # -------------------------------
@@ -57,7 +84,7 @@ def get_images_for_word(word, images, label_to_indices):
 # -------------------------------
 
 def open_gallery_window(canvas, word):
-    selected_images = get_images_for_word(word, images, label_to_indices)
+    selected_images = get_images_for_word(word)
 
     if not selected_images:
         print(f"No images found for the word '{word}'.")
@@ -103,10 +130,19 @@ def display_image_on_canvas(canvas, image_tensor, x=0, y=0):
     image = unnormalize(image_tensor.squeeze(0))
     image = torch.clamp(image, 0, 1)
     image_np = image.permute(1, 2, 0).cpu().numpy()
-    image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+    image_pil = Image.fromarray((image_np * 255).astype(np.uint8)).convert("RGBA")  # Ensure RGBA for transparency
 
     # Resize for canvas display
     resized_image = image_pil.resize((150, 150), Image.LANCZOS)
+
+    def remove_border(image):
+        bbox = image.getbbox()  # Get bounding box of non-transparent content
+        if bbox:
+            return image.crop(bbox)
+        return image
+
+    # Apply to your image before displaying
+    resized_image = remove_border(resized_image)
     image_tk = ImageTk.PhotoImage(resized_image)
     displayed_images.append(image_tk)  # Save reference to prevent garbage collection
     
