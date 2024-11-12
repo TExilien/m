@@ -29,11 +29,11 @@ def google_search_images(query, num_results=20):
     max_results_per_request = 10  # API limit
     image_urls = []
 
-    for start in range(1, num_results, max_results_per_request):
+    for start in range(1, num_results + 1, max_results_per_request):
         params = {
             "key": API_KEY,
             "cx": CSE_ID,
-            "q": query,
+            "q": f"{query} site:https://www.cleanpng.com/free/{query}.html",
             "searchType": "image",
             "num": min(max_results_per_request, num_results - len(image_urls)),
             "start": start,
@@ -53,6 +53,7 @@ def google_search_images(query, num_results=20):
             break
 
     return image_urls[:num_results]  # Return exactly the requested number of images
+
 
 
 # -------------------------------
