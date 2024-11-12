@@ -689,3 +689,414 @@ def run_drawing_app(image_pixel_data):
 
 
 
+If I do the image being magically brought in run into the pixel issue so without lasso tool takes apart image:
+
+
+import os
+import clip
+from torchvision import transforms
+import torch
+import numpy as np
+from PIL import Image, ImageTk
+import tkinter as tk
+from tkinter import Canvas, Toplevel, Button
+from collections import defaultdict
+import time
+
+# -------------------------------
+# Setup and Load the CLIP Model
+# -------------------------------
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model, preprocess = clip.load('ViT-B/32', device=device)
+
+# -------------------------------
+# Load Custom Images and Class Names
+# -------------------------------
+
+image_dir = r"C:\Users\mrtyl\OneDrive\Desktop\testImages"  # Replace with the actual path
+class_names = ["apple", "banana", "cat", "water Bottle", "airplane", "bird", "car", "deer", "horse"]
+image_files = [f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+label_to_indices = defaultdict(list)
+
+# Load images and map them to correct labels based on file names
+images = []
+for idx, image_file in enumerate(image_files):
+    image_path = os.path.join(image_dir, image_file)
+    image = Image.open(image_path)
+
+    # Match label based on filename; skip if no match is found
+    label = next((name for name in class_names if name.lower() in image_file.lower()), None)
+    if label:
+        label_to_indices[label].append(idx)  # Map image index to the correct label
+        images.append(preprocess(image).unsqueeze(0).to(device))
+
+# -------------------------------
+# Updated Retrieval Function to Filter by Label
+# -------------------------------
+
+def get_images_for_word(word, images, label_to_indices):
+    word = word.lower()
+
+    if word in label_to_indices:
+        indices = label_to_indices[word]
+        selected_images = [images[idx] for idx in indices]
+        return selected_images
+    else:
+        print(f"No images found for the word '{word}'.")
+        return []
+
+# -------------------------------
+# Pop-Up Gallery Window
+# -------------------------------
+
+# Store references to images to prevent garbage collection
+displayed_images = []
+
+def display_image_with_fade(canvas, image_tensor, root, x=0, y=0, delay=50):
+    """Display an image on the canvas with a fade-in effect from top to bottom."""
+    # Unnormalize and prepare the image
+    unnormalize = transforms.Normalize(
+        mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+        std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+    image = unnormalize(image_tensor.squeeze(0))
+    image = torch.clamp(image, 0, 1)
+    image_np = image.permute(1, 2, 0).cpu().numpy()
+    image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+
+    # Resize for canvas display
+    resized_image = image_pil.resize((150, 150), Image.LANCZOS)
+    img_width, img_height = resized_image.size
+
+    # Divide the image into slices (rows of pixels)
+    slices = []
+    for i in range(img_height):
+        slice_image = resized_image.crop((0, i, img_width, i + 1))  # Crop one row at a time
+        slice_tk = ImageTk.PhotoImage(slice_image)
+        slices.append(slice_tk)
+
+    displayed_images.append(slices)  # Prevent garbage collection
+
+    def animate_image(slice_idx=0):
+        if slice_idx < img_height:
+            # Display each row slice in sequence to create the fade-in effect
+            canvas.create_image(x, y + slice_idx, anchor='nw', image=slices[slice_idx])
+            root.after(delay, animate_image, slice_idx + 1)  # Schedule the next slice with delay
+
+    animate_image()  # Start the animation
+
+# Gallery window with animated fade-in effect for selected images
+def open_gallery_window(canvas, word,root):
+    selected_images = get_images_for_word(word, images, label_to_indices)
+
+    if not selected_images:
+        print(f"No images found for the word '{word}'.")
+        return
+
+    gallery_window = Toplevel()
+    gallery_window.title(f"Gallery for '{word}'")
+    
+    def on_image_click(selected_image_tensor):
+        gallery_window.destroy()
+        
+        # Display each new image with an offset to avoid overlap and a fade-in effect
+        x_offset = 20 * (len(displayed_images) % 5)  # Horizontal offset
+        y_offset = 20 * (len(displayed_images) // 5)  # Vertical offset
+        display_image_with_fade(canvas, selected_image_tensor, root, x=x_offset, y=y_offset)
+    
+    for i, image_tensor in enumerate(selected_images):
+        unnormalize = transforms.Normalize(
+            mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+            std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+        image = unnormalize(image_tensor.squeeze(0))
+        image = torch.clamp(image, 0, 1)
+        image_np = image.permute(1, 2, 0).cpu().numpy()
+        image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+
+        thumbnail = image_pil.resize((100, 100), Image.LANCZOS)
+        image_tk = ImageTk.PhotoImage(thumbnail)
+
+        button = Button(gallery_window, image=image_tk, command=lambda img=image_tensor: on_image_click(img))
+        button.image = image_tk  # Keep a reference to prevent garbage collection
+        button.grid(row=i // 3, column=i % 3, padx=10, pady=10)
+
+
+Issue now is some of the images have a white box around them so need to select ones that dont like the drawn apple
+
+
+Trying to use google search - doesn't work bc cant get good pictures just get crappy ones with terrible backgrounds
+import os
+import clip
+from torchvision import transforms
+import torch
+import numpy as np
+from PIL import Image, ImageTk
+import tkinter as tk
+from tkinter import Canvas, Topleva el, Button
+from collections import defaultdict
+import time
+import requests
+from io import BytesIO
+from rembg import remove  # Import rembg for background removal
+
+# -------------------------------
+# Setup and Load the CLIP Model
+# -------------------------------
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model, preprocess = clip.load('ViT-B/32', device=device)
+
+# -------------------------------
+# Google Custom Search API Setup
+# -------------------------------
+
+API_KEY = "AIzaSyAvYAyQgwtMddW1Y_gtglh-Re5DGY12S-M"
+CSE_ID = "831f214a05dd14b5a"
+
+def google_search_images(query, num_results=10):
+    search_url = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        "key": API_KEY,
+        "cx": CSE_ID,
+        "q": query,
+        "searchType": "image",
+        "num": num_results,
+    }
+    response = requests.get(search_url, params=params)
+    response.raise_for_status()
+    search_results = response.json().get("items", [])
+    image_urls = [item["link"] for item in search_results]
+    return image_urls
+
+# -------------------------------
+# Updated Retrieval Function to Use Google API with Background Removal
+# -------------------------------
+
+def get_images_for_word(word):
+    try:
+        search_term = f"a singular {word} PNG transparent background"
+        image_urls = google_search_images(search_term, num_results=10)
+        
+        selected_images = []
+        for url in image_urls:
+            try:
+                response = requests.get(url, timeout=5)
+                img = Image.open(BytesIO(response.content)).convert("RGBA")  # Ensure RGBA format
+                
+                # Preprocess and add to selected images
+                selected_images.append(preprocess(img).unsqueeze(0).to(device))
+            except Exception as e:
+                print(f"Skipping an image due to error: {e}")
+                continue
+
+        return selected_images if selected_images else []
+    except Exception as e:
+        print(f"Failed to retrieve images for '{word}': {e}")
+        return []
+
+# -------------------------------
+# Pop-Up Gallery Window
+# -------------------------------
+
+def open_gallery_window(canvas, word):
+    selected_images = get_images_for_word(word)
+
+    if not selected_images:
+        print(f"No images found for the word '{word}'.")
+        return
+
+    # Create a pop-up window to show the gallery
+    gallery_window = Toplevel()
+    gallery_window.title(f"Gallery for '{word}'")
+    
+    def on_image_click(selected_image_tensor):
+        gallery_window.destroy()
+        
+        # Display each new image at an offset to avoid overlap
+        x_offset = 20 * (len(displayed_images) % 5)  # Horizontal offset
+        y_offset = 20 * (len(displayed_images) // 5)  # Vertical offset
+        display_image_on_canvas(canvas, selected_image_tensor, x=x_offset, y=y_offset)
+    
+    for i, image_tensor in enumerate(selected_images):
+        unnormalize = transforms.Normalize(
+            mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+            std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+        image = unnormalize(image_tensor.squeeze(0))
+        image = torch.clamp(image, 0, 1)
+        image_np = image.permute(1, 2, 0).cpu().numpy()
+        image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+
+        thumbnail = image_pil.resize((100, 100), Image.LANCZOS)
+        image_tk = ImageTk.PhotoImage(thumbnail)
+
+        button = Button(gallery_window, image=image_tk, command=lambda img=image_tensor: on_image_click(img))
+        button.image = image_tk  # Keep a reference to prevent garbage collection
+        button.grid(row=i // 3, column=i % 3, padx=10, pady=10)
+
+# -------------------------------
+# Display Selected Image on Main Canvas
+# -------------------------------
+displayed_images = []
+def display_image_on_canvas(canvas, image_tensor, x=0, y=0):
+    # Unnormalize and prepare the image for display
+    unnormalize = transforms.Normalize(
+        mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+        std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+    image = unnormalize(image_tensor.squeeze(0))
+    image = torch.clamp(image, 0, 1)
+    image_np = image.permute(1, 2, 0).cpu().numpy()
+    image_pil = Image.fromarray((image_np * 255).astype(np.uint8)).convert("RGBA")  # Ensure RGBA for transparency
+
+    # Resize for canvas display
+    resized_image = image_pil.resize((150, 150), Image.LANCZOS)
+    image_tk = ImageTk.PhotoImage(resized_image)
+    displayed_images.append(image_tk)  # Save reference to prevent garbage collection
+    
+    # Place the image on the canvas
+    canvas.create_image(x, y, anchor='nw', image=image_tk)
+
+
+
+Trying to use ai and searches for everything - doesn't work cause image sizes and whatnot
+import os
+import clip
+from torchvision import models, transforms
+import torch
+import torch.nn.functional as F
+import numpy as np
+from PIL import Image, ImageTk
+import tkinter as tk
+from tkinter import Canvas, Toplevel, Button
+from io import BytesIO
+import requests
+
+# Setup for device and CLIP model
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model, preprocess = clip.load("ViT-B/32", device=device)
+
+# Pre-trained classifier for filtering
+classifier = models.resnet18(pretrained=True).eval()  # Using ResNet-18
+
+# Transformation for classifier
+classifier_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+# Dictionary to map common words to ImageNet-compatible labels (simplified example)
+word_to_class_id = {
+    "banana": 954,
+    "apple": 948,
+    "cat": 281,
+    "dog": 243,
+    # Add more mappings as needed, or use approximate labels
+}
+# Your Google API key and Custom Search Engine ID (CSE ID)
+API_KEY = "AIzaSyAvYAyQgwtMddW1Y_gtglh-Re5DGY12S-M"
+CSE_ID = "831f214a05dd14b5a"
+
+def google_search_images(query, num_results=10):
+    url = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        "key": API_KEY,
+        "cx": CSE_ID,
+        "q": query,
+        "searchType": "image",
+        "num": num_results,
+        "imgType": "clipart",  # Use clipart to help get simple objects with transparent backgrounds
+        "fileType": "png",     # Request PNGs to increase the chance of transparency
+    }
+    response = requests.get(url, params=params)
+    response.raise_for_status()  # Raise an error if the request failed
+    data = response.json()
+
+    # Extract image URLs from the response
+    image_urls = [item["link"] for item in data.get("items", [])]
+    return image_urls
+
+# Function to determine if an image resembles the target object based on the provided word
+def is_target_object(image, target_word):
+    class_id = word_to_class_id.get(target_word.lower())
+    if class_id is None:
+        print(f"No ImageNet mapping found for '{target_word}'. Skipping filtering.")
+        return True  # If no match is found, assume image is correct
+
+    image_tensor = classifier_transform(image).unsqueeze(0)  # Prepare image for classifier
+    with torch.no_grad():
+        output = classifier(image_tensor)
+        probabilities = F.softmax(output[0], dim=0)
+        top5_prob, top5_catid = torch.topk(probabilities, 5)
+
+        # Check if target class ID is in top 5 predictions
+        return class_id in top5_catid.tolist()
+
+# Function to retrieve and filter images based on word
+def get_images_for_word(word):
+    search_term = f"a singular {word} PNG transparent background"
+    image_urls = google_search_images(search_term, num_results=10)
+    
+    selected_images = []
+    for url in image_urls:
+        try:
+            response = requests.get(url, timeout=5)
+            img = Image.open(BytesIO(response.content)).convert("RGBA")
+            
+            # Filter image by checking if it resembles the target object
+            if is_target_object(img, target_word=word):
+                selected_images.append(preprocess(img).unsqueeze(0).to(device))
+        except Exception as e:
+            print(f"Skipping an image due to error: {e}")
+            continue
+
+    return selected_images if selected_images else []
+
+# GUI and display functions remain mostly the same
+def open_gallery_window(canvas, word):
+    selected_images = get_images_for_word(word)
+
+    if not selected_images:
+        print(f"No images found for the word '{word}'.")
+        return
+
+    gallery_window = Toplevel()
+    gallery_window.title(f"Gallery for '{word}'")
+    
+    def on_image_click(selected_image_tensor):
+        gallery_window.destroy()
+        
+        x_offset = 20 * (len(displayed_images) % 5)
+        y_offset = 20 * (len(displayed_images) // 5)
+        display_image_on_canvas(canvas, selected_image_tensor, x=x_offset, y=y_offset)
+    
+    for i, image_tensor in enumerate(selected_images):
+        unnormalize = transforms.Normalize(
+            mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+            std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+        image = unnormalize(image_tensor.squeeze(0))
+        image = torch.clamp(image, 0, 1)
+        image_np = image.permute(1, 2, 0).cpu().numpy()
+        image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+
+        thumbnail = image_pil.resize((100, 100), Image.LANCZOS)
+        image_tk = ImageTk.PhotoImage(thumbnail)
+
+        button = Button(gallery_window, image=image_tk, command=lambda img=image_tensor: on_image_click(img))
+        button.image = image_tk
+        button.grid(row=i // 3, column=i % 3, padx=10, pady=10)
+
+displayed_images = []
+def display_image_on_canvas(canvas, image_tensor, x=0, y=0):
+    unnormalize = transforms.Normalize(
+        mean=[-0.48145466 / 0.26862954, -0.4578275 / 0.26130258, -0.40821073 / 0.27577711],
+        std=[1 / 0.26862954, 1 / 0.26130258, 1 / 0.27577711])
+    image = unnormalize(image_tensor.squeeze(0))
+    image = torch.clamp(image, 0, 1)
+    image_np = image.permute(1, 2, 0).cpu().numpy()
+    image_pil = Image.fromarray((image_np * 255).astype(np.uint8)).convert("RGBA")
+
+    resized_image = image_pil.resize((150, 150), Image.LANCZOS)
+    image_tk = ImageTk.PhotoImage(resized_image)
+    displayed_images.append(image_tk)
+    
+    canvas.create_image(x, y, anchor='nw', image=image_tk)

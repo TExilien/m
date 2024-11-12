@@ -16,3 +16,4 @@ def talk():
     except sr.RequestError as e:
         print(f"Could not request results from Google Speech Recognition service; {e}")
     return recognizer.recognize_google(audio)
+
