@@ -9,6 +9,7 @@ from tkinter import Canvas, Toplevel, Button
 from collections import defaultdict
 import requests
 from io import BytesIO
+from rembg import remove
 
 # -------------------------------
 # Setup and Load the CLIP Model
@@ -24,12 +25,13 @@ model, preprocess = clip.load('ViT-B/32', device=device)
 API_KEY = "AIzaSyAvYAyQgwtMddW1Y_gtglh-Re5DGY12S-M"
 CSE_ID = "831f214a05dd14b5a"
 
-def google_search_images(query, num_results=20):
+def google_search_images(query, num_results=12):
     search_url = "https://www.googleapis.com/customsearch/v1"
-    max_results_per_request = 10  # API limit
+    max_results_per_request = 10  # Google API limit
     image_urls = []
-
-    for start in range(1, num_results + 1, max_results_per_request):
+    
+    for start in range(1, min(num_results, 101), max_results_per_request):
+        # Primary query restricted to CleanPNG
         params = {
             "key": API_KEY,
             "cx": CSE_ID,
@@ -44,14 +46,41 @@ def google_search_images(query, num_results=20):
             response.raise_for_status()
             search_results = response.json().get("items", [])
             image_urls.extend([item["link"] for item in search_results])
-
+            
             # Stop if we have enough images
             if len(image_urls) >= num_results:
                 break
+            
         except Exception as e:
-            print(f"Failed to retrieve images for '{query}': {e}")
+            print(f"Primary query failed for '{query}': {e}")
             break
-
+    
+    # Fallback to a general search if insufficient results
+    if len(image_urls) < num_results:
+        for start in range(1, min(num_results, 101), max_results_per_request):
+            params = {
+                "key": API_KEY,
+                "cx": CSE_ID,
+                "q": query,  # General query without site restriction
+                "searchType": "image",
+                "num": min(max_results_per_request, num_results - len(image_urls)),
+                "start": start,
+            }
+            
+            try:
+                response = requests.get(search_url, params=params)
+                response.raise_for_status()
+                search_results = response.json().get("items", [])
+                image_urls.extend([item["link"] for item in search_results])
+                
+                # Stop if we have enough images
+                if len(image_urls) >= num_results:
+                    break
+                
+            except Exception as e:
+                print(f"Fallback query failed for '{query}': {e}")
+                break
+    
     return image_urls[:num_results]  # Return exactly the requested number of images
 
 
@@ -62,7 +91,7 @@ def google_search_images(query, num_results=20):
 
 def get_images_for_word(word):
     try:
-        image_urls = google_search_images(word, num_results=20)
+        image_urls = google_search_images(word)
         selected_images = []
         for url in image_urls:
             try:
@@ -79,6 +108,17 @@ def get_images_for_word(word):
     except Exception as e:
         print(f"Failed to retrieve images for '{word}': {e}")
         return []
+
+def remove_background(image):
+    """
+    Use rembg to remove the background from the image.
+    """
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    input_data = buffered.getvalue()
+    output_data = remove(input_data)
+    output_image = Image.open(BytesIO(output_data))
+    return output_image
 
 # -------------------------------
 # Pop-Up Gallery Window
@@ -113,6 +153,7 @@ def open_gallery_window(canvas, word):
         image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
 
         thumbnail = image_pil.resize((100, 100), Image.LANCZOS)
+        thumbnail = remove_background(thumbnail)
         image_tk = ImageTk.PhotoImage(thumbnail)
 
         button = Button(gallery_window, image=image_tk, command=lambda img=image_tensor: on_image_click(img))
@@ -136,14 +177,10 @@ def display_image_on_canvas(canvas, image_tensor, x=0, y=0):
     # Resize for canvas display
     resized_image = image_pil.resize((150, 150), Image.LANCZOS)
 
-    def remove_border(image):
-        bbox = image.getbbox()  # Get bounding box of non-transparent content
-        if bbox:
-            return image.crop(bbox)
-        return image
+    # Remove the checkerboard pattern
+    resized_image = remove_background(resized_image)
 
     # Apply to your image before displaying
-    resized_image = remove_border(resized_image)
     image_tk = ImageTk.PhotoImage(resized_image)
     displayed_images.append(image_tk)  # Save reference to prevent garbage collection
     
