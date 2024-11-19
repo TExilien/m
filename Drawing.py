@@ -39,6 +39,9 @@ lassoEndY = 0
 moveLasso = False
 lassoObjects = []
 inZoom = False
+toolNames = ["Pencil", "Eraser", "Lasso"]
+toolSelect = StringVar()
+toolSelect.set("Pencil")
 
 canvas_data = []
 
@@ -50,6 +53,22 @@ shapes = []
 shapeFill = "black"
 width = 0
 height = 0
+
+toolNumber = 0
+numTools = 3
+
+def cycleTool():
+    global toolNumber, toolSelect
+    toolNumber = (toolNumber + 1) % numTools
+    toolSelect.set(toolNames[toolNumber])
+    match toolNumber:
+        case 0:
+            pencil()
+        case 1:
+            lasso()
+        case 2:
+            eraser()
+
 
 # Increase Stroke Size By 1
 def strokeI():
@@ -136,6 +155,10 @@ def resetLasso():
 # Eraser is less erasing and actually just painting over the pencil with white
 def eraser():
     global penColor
+
+    resetLasso()
+    inZoom = False
+
 
     penColor = "white"
     canvas["cursor"] = DOTBOX
@@ -446,13 +469,27 @@ holder.rowconfigure(0, minsize=30)
 label123 = Label(holder, text="TOOLS", borderwidth=1, relief=SOLID, width=15)
 label123.grid(row=0, column=0)
 
+toolMenu = OptionMenu(holder, toolSelect, *toolNames)
+toolMenu.grid(row=1, column=0)
+toolMenu.config(width=8)
+
+'''
+selectTool = Button(holder, text=toolName, height=1, width=12)
+selectTool.grid(row=1, column=0)
+'''
+
 # Tool 1 - Pencil
+
+'''
 pencilButton = Button(holder, text="Pencil", height=1, width=12, command=pencil)
 pencilButton.grid(row=1, column=0)
 
 # Tool 2 - Eraser
 eraserButton = Button(holder, text="Eraser", height=1, width=12, command=eraser)
 eraserButton.grid(row=2, column=0)
+
+
+'''
 
 # Tool 3 - Color Change
 colorButton = Button(
@@ -596,6 +633,7 @@ root.bind("<Up>", lambda event: moveLassoObject("Up"))
 root.bind("<Down>", lambda event: moveLassoObject("Down"))
 root.bind("<i>", lambda event: zoom(event, 2))
 root.bind("<o>", lambda event: zoom(event, 0.5))
+root.bind("<n>", lambda event: cycleTool())
 
 ########### Main Loop ###########
 canvas.pack()
