@@ -153,7 +153,7 @@ def open_gallery_window(canvas, word):
         image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
 
         thumbnail = image_pil.resize((100, 100), Image.LANCZOS)
-        thumbnail = remove_background(thumbnail)
+        #thumbnail = remove_background(thumbnail)
         image_tk = ImageTk.PhotoImage(thumbnail)
 
         button = Button(gallery_window, image=image_tk, command=lambda img=image_tensor: on_image_click(img))
