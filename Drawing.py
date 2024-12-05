@@ -45,7 +45,7 @@ toolSelect.set("Pencil")
 
 canvas_data = []
 
-WIDTH = 60
+WIDTH = 80
 HEIGHT = 450
 
 fileSelect = StringVar()
@@ -385,7 +385,7 @@ label123.grid(row=0, column=0)
 # Tool 1 - Cycle (Pencil, Eraser, Lasso)
 toolMenu = OptionMenu(holder, toolSelect, *toolNames)
 toolMenu.grid(row=1, column=0)
-toolMenu.config(width=8)
+toolMenu.config(height=1, width=int(WIDTH/4 - 5))
 
 '''
 selectTool = Button(holder, text=toolSelect, height=1, width=12)
@@ -458,15 +458,18 @@ sizeiButton.grid(row=1, column=3)
 sizedButton = Button(holder, text="Decrease", height=1, width=int(WIDTH/4 - 3), command=strokeD)
 sizedButton.grid(row=2, column=3)
 
+'''
 # Tool 12 - Default
 defaultButton = Button(holder, text="Default", height=1, width=int(WIDTH/4 - 3), command=strokeDf)
 defaultButton.grid(row=3, column=3)
 
+'''
+
 # Tool 13 - Speech-Draw
 DimensionButton = Button(
-    holder, text="speech-Draw", height=1, width=12, command=speak
+    holder, text="speech-Draw", height=1, width=int(WIDTH/4 - 3), command=speak
 )
-DimensionButton.grid(row=3, column=4)
+DimensionButton.grid(row=3, column=3)
 
 
 #### Canvas Frame ####
