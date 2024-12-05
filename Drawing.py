@@ -45,14 +45,13 @@ toolSelect.set("Pencil")
 
 canvas_data = []
 
-shapeSelect = StringVar()
-shapeList = ["None", "Square", "Circle/Oval", "Rectangle", "Line"]
-shapeSelect.set("None")
-selected_shape = None
-shapes = []
-shapeFill = "black"
-width = 0
-height = 0
+WIDTH = 60
+HEIGHT = 450
+
+fileSelect = StringVar()
+fileList = ["None", "Open", "New"]
+
+
 
 toolNumber = 0
 numTools = 3
@@ -176,70 +175,6 @@ def colorChoice():
 
     else:
         pass
-
-
-# Shape Color Chooser
-def shapeColorChoice():
-    global shapeFill
-
-    color = colorchooser.askcolor(title="Select a Color")
-    canvas["cursor"] = "pencil"
-
-    if color[1]:
-        shapeFill = color[1]
-
-    else:
-        shapeFill = "black"
-
-def on_shape_click(event):
-    #Capture the initial position of the mouse click
-    global currentPoint, shapeSelect, shapeFill, selected_shape, width, height
-
-    x = event.x
-    y = event.y
-
-    # Check if a shape is selected in the OptionMenu
-    if shapeSelect.get() != "None":
-        askShapeDimension()  # Ask for dimensions if needed
-
-        # Create the shape based on the selection
-        match shapeSelect.get():
-            case "Square":
-                canvas.create_rectangle(x, y, x + width, y + height, fill=shapeFill)
-            case "Circle/Oval":
-                canvas.create_oval(x, y, x + width, y + height, fill=shapeFill)
-            case "Rectangle":
-                canvas.create_rectangle(x, y, x + width, y + height, fill=shapeFill)
-            case "Line":
-                canvas.create_line(x, y, x + width, y + height, fill=shapeFill, width=stroke)
-            case _:
-                pass
-    else:
-        # If no shape is selected, allow the user to move shapes as usual
-        shape = canvas.find_closest(x, y)
-        selected_shape = shape[0]
-
-        currentPoint = [x, y]
-
-def on_shape_drag(event):
-    global currentPoint
-    global selected_shape
-
-    x = currentPoint[0]
-    y = currentPoint[1]
-
-    if selected_shape is not None:
-        # Calculate the difference in position
-        dx = event.x - x
-        dy = event.y - y
-
-        # Move the shape by that distance
-        canvas.move(selected_shape, dx, dy)
-
-        # Update the known position
-        x = event.x
-        y = event.y
-        currentPoint = [x,y]
 
 # Paint Function
 def paint(event):
@@ -403,32 +338,8 @@ def redrawCanvas():
             color = obj["color"]
             coords = obj["coords"]
             canvas.create_polygon(coords, fill=color, outline=color, width=stroke)
-
-
-# Asking Shape Dimensions
-def askShapeDimension():
-    global width, height
-
-    width = simpledialog.askinteger(
-        "ECTS - Paint App", f"Enter Width for {shapeSelect.get()}"
-    )
-
-    height = simpledialog.askinteger(
-        "ECTS - Paint App", f"Enter Height for {shapeSelect.get()}"
-    )
-    if width and height:
-        print(width, height)
-
-
-# Key Binding to Show Shape OptionMenu
-def show_shape_menu(event):
-    # Get the current position of the shape OptionMenu
-    x = shapeMenu.winfo_rootx()
-    y = shapeMenu.winfo_rooty() + shapeMenu.winfo_height()
-
-    # Post the menu at the current position
-    shapeMenu['menu'].post(x, y)
-
+        
+# Speech To Draw 
 def speak():
     # Run the drawing app with the retrieved image pixel data
     print("say your object please")
@@ -466,128 +377,96 @@ holder.rowconfigure(0, minsize=30)
 #### Tools ####
 
 # Label for Tool 1,2,3
-label123 = Label(holder, text="TOOLS", borderwidth=1, relief=SOLID, width=15)
+label123 = Label(holder, text="TOOLS", borderwidth=1, relief=SOLID, width=int(WIDTH/4))
 label123.grid(row=0, column=0)
 
+
+
+# Tool 1 - Cycle (Pencil, Eraser, Lasso)
 toolMenu = OptionMenu(holder, toolSelect, *toolNames)
 toolMenu.grid(row=1, column=0)
 toolMenu.config(width=8)
 
 '''
-selectTool = Button(holder, text=toolName, height=1, width=12)
+selectTool = Button(holder, text=toolSelect, height=1, width=12)
 selectTool.grid(row=1, column=0)
 '''
 
-# Tool 1 - Pencil
-
-'''
-pencilButton = Button(holder, text="Pencil", height=1, width=12, command=pencil)
-pencilButton.grid(row=1, column=0)
-
-# Tool 2 - Eraser
-eraserButton = Button(holder, text="Eraser", height=1, width=12, command=eraser)
-eraserButton.grid(row=2, column=0)
-
-
-'''
-
-# Tool 3 - Color Change
+# Tool 2 - Color Change
 colorButton = Button(
-    holder, text="Select Color", height=1, width=12, command=colorChoice
+    holder, text="Select Color", height=1, width=int(WIDTH/4 - 3), command=colorChoice
 )
-colorButton.grid(row=3, column=0)
+colorButton.grid(row=2, column=0)
+
+# Tool 3 - Exit App
+exitButton = Button(
+    holder, text="Exit", height=1, width=int(WIDTH/4 - 3), command=lambda: root.destroy())
+exitButton.grid(row=3, column=0)
+
 
 #### FILE ACTIONS ####
 
-# Label for Tool 4,5,6
-label456 = Label(holder, text="FILE", borderwidth=1, relief=SOLID, width=15)
+# Label for Tool 4,5,6 
+label456 = Label(holder, text="FILE", borderwidth=1, relief=SOLID, width=int(WIDTH/4))
 label456.grid(row=0, column=1)
 
 # Tool 4 - Save File
-saveButton = Button(holder, text="SAVE", height=1, width=12, command=saveImg)
+saveButton = Button(holder, text="SAVE", height=1, width=int(WIDTH/4 - 3), command=saveImg)
 saveButton.grid(row=1, column=1)
 
 # Tool 5 - Open File
-openButton = Button(holder, text="OPEN", height=1, width=12, command=openEcts)
+openButton = Button(holder, text="OPEN", height=1, width=int(WIDTH/4 - 3), command=openEcts)
 openButton.grid(row=2, column=1)
 
 # Tool 6 - New Paint
-newButton = Button(holder, text="NEW", height=1, width=12, command=newApp)
+newButton = Button(holder, text="NEW", height=1, width=int(WIDTH/4 - 3), command=newApp)
 newButton.grid(row=3, column=1)
 
-# Tool 10 - Exit App
-exitButton = Button(
-    holder, text="Exit", height=1, width=12, command=lambda: root.destroy())
-exitButton.grid(row=4, column=1)
+
 
 
 #### OTHER ####
 
-# Label for Tool 7, 8, 9, 10, 11
-label7 = Label(holder, text="OTHER", borderwidth=1, relief=SOLID, width=15)
+# Label for Tool 7, 8, 9
+label7 = Label(holder, text="OTHER", borderwidth=1, relief=SOLID, width=int(WIDTH/4))
 label7.grid(row=0, column=2)
 
 # Tool 7 - Clear Screen
-clearButton = Button(holder, text="CLEAR", height=1, width=12, command=clearScreen)
+clearButton = Button(holder, text="CLEAR", height=1, width=int(WIDTH/4 - 3), command=clearScreen)
 clearButton.grid(row=1, column=2)
 
-# Tool 8 - Zoom in and out of Canvas
-zoomin = Button(holder, text="Zoom In", height=1, width=12, command=zoomControl)
+# Tool 8 and 9 - Zoom in and out of Canvas
+zoomin = Button(holder, text="Zoom In", height=1, width=int(WIDTH/4 - 3), command=zoomControl)
 zoomin.grid(row=2, column=2)
 
-zoomout= Button(holder, text="Zoom Out", height=1, width=12, command=zoomControl)
-zoomout.grid(row=3, column=2)
 
-# Tool 8 - Lasso
-lassoButton = Button(holder, text="LASSO", height=1, width=12, command=lasso)
-lassoButton.grid(row=4, column=2)
+zoomout= Button(holder, text="Zoom Out", height=1, width=int(WIDTH/4 - 3), command=zoomControl)
+zoomout.grid(row=3, column=2)
 
 
 #### Stroke Size ####
 
-# Label for Tool 8, 9 and 10
-label8910 = Label(holder, text="STROKE SIZE", borderwidth=1, relief=SOLID, width=15)
+# Label for 10, 11, 12, 13
+label8910 = Label(holder, text="STROKE SIZE", borderwidth=1, relief=SOLID, width=int(WIDTH/4))
 label8910.grid(row=0, column=3)
 
-# Tool 8 - Increament by 1
-sizeiButton = Button(holder, text="Increase", height=1, width=12, command=strokeI)
+# Tool 10 - Increament by 1
+sizeiButton = Button(holder, text="Increase", height=1, width=int(WIDTH/4 - 3), command=strokeI)
 sizeiButton.grid(row=1, column=3)
 
-# Tool 9 - Decreament by 1
-sizedButton = Button(holder, text="Decrease", height=1, width=12, command=strokeD)
+# Tool 11 - Decreament by 1
+sizedButton = Button(holder, text="Decrease", height=1, width=int(WIDTH/4 - 3), command=strokeD)
 sizedButton.grid(row=2, column=3)
 
-# Tool 10 - Default
-defaultButton = Button(holder, text="Default", height=1, width=12, command=strokeDf)
+# Tool 12 - Default
+defaultButton = Button(holder, text="Default", height=1, width=int(WIDTH/4 - 3), command=strokeDf)
 defaultButton.grid(row=3, column=3)
 
-#### Shapes ####
-
-# Label for Tool 11,12,13
-label1123 = Label(holder, text="SHAPES", borderwidth=1, relief=SOLID, width=15)
-label1123.grid(row=0, column=4)
-
-# Tool 11 - shapeSelector
-shapeMenu = OptionMenu(holder, shapeSelect, *shapeList)
-shapeMenu.grid(row=1, column=4)
-shapeMenu.config(width=8)
-
-# Tool 9 - Decreament by 1
-DimensionButton = Button(
-    holder, text="Dimension", height=1, width=12, command=askShapeDimension
-)
-DimensionButton.grid(row=2, column=4)
-
-# Tool 9 - Speech-Draw
+# Tool 13 - Speech-Draw
 DimensionButton = Button(
     holder, text="speech-Draw", height=1, width=12, command=speak
 )
 DimensionButton.grid(row=3, column=4)
-
-# Tool 10 - Default
-fillButton = Button(holder, text="Fill", height=1, width=12, command=shapeColorChoice)
-fillButton.grid(row=4, column=4)
-
 
 
 #### Canvas Frame ####
@@ -606,8 +485,7 @@ canvas.config(cursor="pencil")
 canvas.bind("<B1-Motion>", paint)
 canvas.bind("<ButtonRelease-1>", paint)
 canvas.bind("<Button-1>", paint)
-canvas.bind("<Button-3>", on_shape_click)
-canvas.bind("<B3-Motion>", on_shape_drag)
+
 
 
 # Key Bindings
@@ -622,10 +500,8 @@ root.bind("<Control-n>", lambda event: newApp())
 root.bind("<l>", lambda event: lasso())
 root.bind("<Delete>", lambda event: clearScreen())
 root.bind("<Control-d>", lambda event: clearScreen())
-root.bind("<d>", lambda event: askShapeDimension())
-root.bind("<f>", lambda event: shapeColorChoice())
+
 root.bind("<t>", lambda event: speak())
-root.bind("<s>", show_shape_menu)
 root.bind("<l>", lambda event: lasso())
 root.bind("<Left>", lambda event: moveLassoObject("Left"))
 root.bind("<Right>", lambda event: moveLassoObject("Right"))
