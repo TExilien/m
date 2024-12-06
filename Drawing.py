@@ -1,6 +1,6 @@
 ########### Imports ###########
 
-from tkinter import Tk, Frame, Canvas, CENTER, Button, NW, Label, SOLID
+from tkinter import Tk, Frame, Canvas, CENTER, Button, NW, Label, SOLID, W
 from tkinter import colorchooser, filedialog, OptionMenu, messagebox
 from tkinter import DOTBOX, StringVar, simpledialog
 from tkinter import *
@@ -16,11 +16,8 @@ import mic, model
 ## 
 
 root = Tk()
-canvas = Canvas(root)
-
 root.title("Paint - ECTS v1.0")
-root.geometry("800x800")
-
+root.geometry("700x700")
 root.resizable(True, True)
 
 ########### Functions ###########
@@ -39,6 +36,7 @@ lassoEndY = 0
 moveLasso = False
 lassoObjects = []
 inZoom = False
+selected_shape = None
 toolNames = ["Pencil", "Eraser", "Lasso"]
 toolSelect = StringVar()
 toolSelect.set("Pencil")
@@ -267,8 +265,39 @@ def moveLassoObject(direction):
         canvas.move(object, translate[0], translate[1])
 
 
+def on_shape_click(event):
+    #Capture the initial position of the mouse click
+    global currentPoint, selected_shape
 
-    
+    x = event.x
+    y = event.y
+
+    shape = canvas.find_closest(x, y)
+    selected_shape = shape[0]
+
+    currentPoint = [x, y]
+
+
+def on_shape_drag(event):
+    global currentPoint
+    global selected_shape
+
+    x = currentPoint[0]
+    y = currentPoint[1]
+
+    if selected_shape is not None:
+        # Calculate the difference in position
+        dx = event.x - x
+        dy = event.y - y
+
+        # Move the shape by that distance
+        canvas.move(selected_shape, dx, dy)
+
+        # Update the known position
+        x = event.x
+        y = event.y
+        currentPoint = [x,y]
+
 
 # Close App
 def newApp():
@@ -357,22 +386,27 @@ def zoom(event, scale):
 
 #### Paint Tools Frame ####
 
-# Main Frame
-frame1 = Frame(root, height=150, width=800)
-frame1.grid(row=0, column=0)
+# Main Frame (frame1)
+frame1 = Frame(root, height=150)
+frame1.grid(row=0, column=0, sticky="nsew")  # Expand frame to fill space
+root.grid_rowconfigure(0, weight=1)  # Allow row 0 to resize
+root.grid_columnconfigure(0, weight=1)  # Allow column 0 to resize
 
-# Holder Frame
-holder = Frame(frame1, height=120, width=600, bg="white", pady=10)
-holder.grid(row=0, column=0, sticky=W)
-holder.place(x=0, y=0)
+# Holder Frame (inside frame1)
+holder = Frame(frame1, bg="white", pady=10)
+holder.pack(fill="x")  # Automatically stretch to the width of frame1
 
-holder.columnconfigure(0, minsize=120)
-holder.columnconfigure(1, minsize=120)
-holder.columnconfigure(2, minsize=120)
-holder.columnconfigure(3, minsize=120)
-holder.columnconfigure(4, minsize=120)
+# Canvas setup
+canvas_width = 600
+canvas_height = 500
+canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="white")
+canvas.grid(row=1, column=0, sticky="nsew")  # Fill available space
+root.grid_rowconfigure(1, weight=1)  # Allow canvas row to resize
+root.grid_columnconfigure(0, weight=1)  # Allow canvas column to resize
 
-holder.rowconfigure(0, minsize=30)
+# Configure holder columns (if needed)
+for i in range(5):  # 5 evenly spaced columns
+    holder.columnconfigure(i, weight=1)
 
 #### Tools ####
 
@@ -488,6 +522,8 @@ canvas.config(cursor="pencil")
 canvas.bind("<B1-Motion>", paint)
 canvas.bind("<ButtonRelease-1>", paint)
 canvas.bind("<Button-1>", paint)
+canvas.bind("<Button-3>", on_shape_click)
+canvas.bind("<B3-Motion>", on_shape_drag)
 
 
 

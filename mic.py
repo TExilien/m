@@ -3,9 +3,9 @@ def talk():
     # Initialize recognizer class (for recognizing the speech)
     recognizer = sr.Recognizer()
 
-    file_path = "micTestApple.wav" #reaplace with path to .wav file
-
-    '''# Capture the audio from the microphone
+    #file_path = "micTestApple.wav" #reaplace with path to .wav file
+#If using computer mic keep following with if not comment out and uncomment other block
+    # Capture the audio from the microphone
     with sr.Microphone() as source:
         print("Say something!")
         audio = recognizer.listen(source)
@@ -14,7 +14,7 @@ def talk():
     with sr.AudioFile(file_path) as source:
         print("Processing the audio file...")
         audio = recognizer.record(source)  # Read the entire audio file
-
+    '''
     # Recognize the speech using Google Web Speech API
     try:
         print("You said: " + recognizer.recognize_google(audio))
